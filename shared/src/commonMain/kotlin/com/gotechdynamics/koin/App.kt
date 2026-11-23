@@ -1,49 +1,96 @@
 package com.gotechdynamics.koin
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.safeContentPadding
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.painterResource
+import androidx.compose.runtime.Composable
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.ui.NavDisplay
+import androidx.savedstate.serialization.SavedStateConfiguration
+import com.gotechdynamics.koin.feature.posts.presentation.CreatePostScreen
+import com.gotechdynamics.koin.feature.posts.presentation.EditPostScreen
+import com.gotechdynamics.koin.feature.posts.presentation.PostsScreen
+import com.gotechdynamics.koin.feature.todos.presentation.TodosScreen
+import com.gotechdynamics.koin.navigation.CreatePostRoute
+import com.gotechdynamics.koin.navigation.EditPostRoute
+import com.gotechdynamics.koin.navigation.PostsRoute
+import com.gotechdynamics.koin.navigation.TodosRoute
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
 
-import koin.shared.generated.resources.Res
-import koin.shared.generated.resources.compose_multiplatform
+private val navigationConfig = SavedStateConfiguration {
+    serializersModule = SerializersModule {
+        polymorphic(NavKey::class) {
+            subclass(PostsRoute::class, PostsRoute.serializer())
+            subclass(EditPostRoute::class, EditPostRoute.serializer())
+            subclass(CreatePostRoute::class, CreatePostRoute.serializer())
+            subclass(TodosRoute::class, TodosRoute.serializer())
+        }
+    }
+}
 
 @Composable
-@Preview
 fun App() {
     MaterialTheme {
-        var showContent by remember { mutableStateOf(false) }
-        Column(
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .safeContentPadding()
-                .fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Button(onClick = { showContent = !showContent }) {
-                Text("Click me!")
-            }
-            AnimatedVisibility(showContent) {
-                val greeting = remember { Greeting().greet() }
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Image(painterResource(Res.drawable.compose_multiplatform), null)
-                    Text("Compose: $greeting")
+        val backStack = rememberNavBackStack(navigationConfig, PostsRoute)
+
+        NavDisplay(
+            backStack = backStack,
+            onBack = {
+                if (backStack.size > 1) backStack.removeLastOrNull()
+            },
+            entryDecorators = listOf(
+                rememberSaveableStateHolderNavEntryDecorator(),
+                rememberViewModelStoreNavEntryDecorator(),
+            ),
+            entryProvider = entryProvider {
+                entry<PostsRoute> {
+                    PostsScreen(
+                        onPostClick = { id ->
+                            backStack.add(EditPostRoute(id))
+                        },
+                        onCreateClick = {
+                            backStack.add(CreatePostRoute)
+                        },
+                        onTodosClick = {
+                            backStack.add(TodosRoute)
+                        }
+                    )
+                }
+
+                entry<EditPostRoute> { route ->
+                    EditPostScreen(
+                        postId = route.postId,
+                        onBack = { backStack.removeLastOrNull() },
+                        onSaved = { updatedPost ->
+                            backStack.removeLastOrNull()
+                        }
+                    )
+                }
+                entry<CreatePostRoute> {
+                    CreatePostScreen(
+                        onBack = { backStack.removeLastOrNull() },
+                        onCreated = { post ->
+                            backStack.removeLastOrNull()
+                        },
+                    )
+                }
+                entry<TodosRoute> {
+                    TodosScreen(
+                        onTodoClick = { id ->
+                        },
+                        onCreateClick = {
+                        },
+                        onBack = {
+                            backStack.removeLastOrNull()
+                        },
+
+                        )
                 }
             }
-        }
+        )
+
     }
 }
